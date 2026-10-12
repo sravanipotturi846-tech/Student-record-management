@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Record Manager</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:linear-gradient(135deg,#eef2ff,#f8fafc);min-height:100vh;padding:25px}
+.container{max-width:950px;margin:auto;background:white;border-radius:18px;box-shadow:0 10px 35px #0002;overflow:hidden}
+header{background:linear-gradient(135deg,#4f46e5,#7c3aed);color:white;padding:28px;text-align:center}
+header h1{margin:0 0 7px;font-size:30px} header p{margin:0;opacity:.9}
+.form{padding:25px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+label{font-weight:bold;display:block;margin-bottom:7px}
+input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;font-size:15px}
+input:focus{outline:2px solid #818cf8;border-color:#6366f1}
+.buttons{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+button{border:0;border-radius:9px;padding:11px 18px;font-weight:bold;cursor:pointer;font-size:15px}
+button:active{transform:scale(.98)}
+.submit{background:#4f46e5;color:white}.clear{background:#e2e8f0}.delete{background:#ef4444;color:white}.download{background:#16a34a;color:white}
+button:hover{opacity:.9}
+.records{padding:0 25px 25px}h2{font-size:20px;margin:5px 0 15px}
+.table-wrap{overflow:auto;border:1px solid #e2e8f0;border-radius:10px}
+table{width:100%;border-collapse:collapse;min-width:600px}th,td{padding:13px;text-align:left;border-bottom:1px solid #e2e8f0}th{background:#f1f5f9}
+tbody tr{cursor:pointer}tr.selected{background:#e0e7ff}
+.message{margin-top:12px;padding:10px;border-radius:8px;display:none}.success{display:block;background:#dcfce7;color:#166534}.error{display:block;background:#fee2e2;color:#991b1b}
+.empty{text-align:center;color:#64748b;padding:25px}
+.no-js{padding:12px;background:#fee2e2;color:#991b1b;text-align:center;font-weight:bold}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.buttons button{width:100%}body{padding:10px}header h1{font-size:24px}}
+</style>
+</head>
+<body>
+<noscript><div class="no-js">JavaScript is disabled. Please open this HTML file in Chrome or another browser with JavaScript enabled.</div></noscript>
+<div class="container">
+<header><h1>STUDENT RECORD MANAGER</h1><p>Add, validate, save, read, delete and download student records</p></header>
+
+<form class="form" id="studentForm">
+<div class="grid">
+<div><label for="studentId">Student ID</label><input id="studentId" placeholder="Enter Student ID" autocomplete="off"></div>
+<div><label for="studentName">Student Name</label><input id="studentName" placeholder="Enter Student Name" autocomplete="name"></div>
+<div><label for="email">Email</label><input id="email" type="email" placeholder="student@gmail.com" autocomplete="email"></div>
+</div>
+<div class="buttons">
+<button class="submit" type="submit">➕ Submit Student</button>
+<button class="clear" type="button" id="clearBtn">Clear</button>
+<button class="delete" type="button" id="deleteBtn">🗑 Delete Selected</button>
+<button class="download" type="button" id="downloadBtn">⬇ Download Records</button>
+</div>
+<div id="message" class="message" role="status"></div>
+</form>
+
+<section class="records">
+<h2>📋 Student Records</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Student ID</th><th>Student Name</th><th>Email</th></tr></thead>
+<tbody id="recordBody"></tbody>
+</table></div>
+</section>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  let records = [];
+  let selectedId = null;
+  try { records = JSON.parse(localStorage.getItem('studentRecords') || '[]'); if(!Array.isArray(records)) records=[]; } catch(e) { records=[]; }
+
+  function showMessage(text,type){
+    const m=$('message'); m.textContent=text; m.className='message '+type;
+    clearTimeout(showMessage.timer); showMessage.timer=setTimeout(()=>m.className='message',3000);
+  }
+  function saveRecords(){
+    try { localStorage.setItem('studentRecords',JSON.stringify(records)); return true; }
+    catch(e){ showMessage('Could not save records on this device.','error'); return false; }
+  }
+  function escapeHtml(value){
+    return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  }
+  function renderRecords(){
+    const body=$('recordBody'); body.innerHTML='';
+    if(!records.length){ body.innerHTML='<tr><td colspan="3" class="empty">No student records found.</td></tr>'; return; }
+    records.forEach(r=>{
+      const tr=document.createElement('tr');
+      if(r.id===selectedId) tr.classList.add('selected');
+      tr.innerHTML='<td>'+escapeHtml(r.id)+'</td><td>'+escapeHtml(r.name)+'</td><td>'+escapeHtml(r.email)+'</td>';
+      tr.addEventListener('click',function(){ selectedId=r.id; renderRecords(); showMessage('Selected: '+r.name,'success'); });
+      body.appendChild(tr);
+    });
+  }
+  function submitRecords(){
+ try{
+   if(records.length===0) throw new Error("Add at least one student before submitting.");
+   saveRecords();
+   showMessage("Student records submitted and saved successfully!","success");
+ }catch(e){showMessage(e.message,"error")}
+}
+
+function clearForm(){
+    $('studentId').value=''; $('studentName').value=''; $('email').value=''; selectedId=null; renderRecords(); $('studentId').focus();
+  }
+  function addStudent(e){
+    if(e) e.preventDefault();
+    const id=$('studentId').value.trim(), name=$('studentName').value.trim(), email=$('email').value.trim();
+    if(!id || !name || !email){ showMessage('All fields are required.','error'); return; }
+    const emailRegex=/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if(!emailRegex.test(email)){ showMessage('Please enter a valid email address.','error'); return; }
+    if(records.some(r=>String(r.id).toLowerCase()===id.toLowerCase())){ showMessage('Student ID already exists.','error'); return; }
+    records.push({id,name,email});
+    saveRecords(); renderRecords();
+    $('studentId').value=''; $('studentName').value=''; $('email').value=''; selectedId=null;
+    showMessage('Student added successfully!','success'); $('studentId').focus();
+  }
+  function deleteSelected(){
+    if(selectedId===null){ showMessage('Select a student record first.','error'); return; }
+    const student=records.find(r=>r.id===selectedId);
+    if(!student){ selectedId=null; renderRecords(); showMessage('Selected record was not found.','error'); return; }
+    if(window.confirm('Delete '+student.name+'?')){
+      records=records.filter(r=>r.id!==selectedId); selectedId=null; saveRecords(); renderRecords(); showMessage('Student deleted successfully!','success');
+    }
+  }
+  function downloadRecords(){
+    if(!records.length){ showMessage('There are no records to download.','error'); return; }
+    let csv='Student ID,Student Name,Email\n';
+    records.forEach(r=>{ csv+='"'+String(r.id).replace(/"/g,'""')+'","'+String(r.name).replace(/"/g,'""')+'","'+String(r.email).replace(/"/g,'""')+'"\n'; });
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const url=URL.createObjectURL(blob); const a=document.createElement('a');
+    a.href=url; a.download='student_records.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000); showMessage('Records downloaded successfully!','success');
+  }
+  $('studentForm').addEventListener('submit',addStudent);
+  $('clearBtn').addEventListener('click',clearForm);
+  $('deleteBtn').addEventListener('click',deleteSelected);
+  $('downloadBtn').addEventListener('click',downloadRecords);
+  renderRecords();
+})();
+</script>
+</body>
+</html>
